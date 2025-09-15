@@ -31,7 +31,7 @@ export default function HomeScreen() {
   });
   
   const [waterQuality, setWaterQuality] = useState<WaterQualityData>({
-    ph: 7.2,
+    ph: 7.4,
     turbidity: 2.1,
     temperature: 24.5,
     status: 'safe',
