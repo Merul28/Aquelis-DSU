@@ -131,8 +131,8 @@ export const NotificationSystem: React.FC<NotificationSystemProps> = ({ visible,
               <ThemedText style={styles.clearButtonText}>Clear All</ThemedText>
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <IconSymbol name="xmark" size={20} color="#666" />
+          <TouchableOpacity onPress={onClose} style={styles.closeButtonEnhanced}>
+            <IconSymbol name="xmark" size={24} color="white" />
           </TouchableOpacity>
         </View>
       </View>
@@ -285,6 +285,15 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     padding: 8,
+  },
+  closeButtonEnhanced: {
+    padding: 12,
+    backgroundColor: '#F44336',
+    borderRadius: 20,
+    minWidth: 40,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     flex: 1,

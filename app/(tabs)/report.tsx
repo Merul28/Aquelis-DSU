@@ -495,6 +495,7 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
+    paddingTop: 60,
     alignItems: 'center',
     backgroundColor: '#FF5722',
     marginBottom: 20,

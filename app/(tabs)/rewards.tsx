@@ -673,6 +673,7 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
+    paddingTop: 60,
     alignItems: 'center',
     backgroundColor: '#FFD700',
     marginBottom: 0,
