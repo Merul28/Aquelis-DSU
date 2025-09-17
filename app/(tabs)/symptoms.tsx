@@ -138,7 +138,7 @@ export default function AIHealthCheckerScreen() {
       SYMPTOMS_LIST.find(s => s.id === id)?.name || id
     );
 
-    const prompt = `You are a specialized medical AI assistant with expertise in water-borne diseases, waterborne pathogens, and water-related health issues.
+    const prompt = `You are a specialized medical AI assistant with expertise in water-borne diseases, waterborne pathogens, and water related health issues.
 
 PATIENT INFORMATION:
 - Symptoms: ${symptomNames.join(', ')}
