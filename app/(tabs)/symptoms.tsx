@@ -1,19 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-// OpenAI Configuration - Using environment variable
-const OPENAI_API_KEY = process.env.PUBLIC_OPENAI_API_KEY;
-const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+// OpenAI Configuration
+const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 
 interface Symptom {
   id: string;
   name: string;
-  category: 'gastrointestinal' | 'respiratory' | 'skin' | 'neurological' | 'general';
-  severity: 'mild' | 'moderate' | 'severe';
+  category:
+    | "gastrointestinal"
+    | "respiratory"
+    | "skin"
+    | "neurological"
+    | "general";
+  severity: "mild" | "moderate" | "severe";
   icon: string;
 }
 
@@ -26,7 +38,7 @@ interface AIHealthAssessment {
     commonDuration?: string;
     waterSource?: string;
   }>;
-  riskLevel: 'low' | 'medium' | 'high';
+  riskLevel: "low" | "medium" | "high";
   homeRemedies: string[];
   whenToSeekHelp: string[];
   generalAdvice: string[];
@@ -50,46 +62,192 @@ interface HealthAssessment {
 }
 
 const SYMPTOMS_LIST: Symptom[] = [
-  { id: 'severe_diarrhea', name: 'Severe Diarrhea', category: 'gastrointestinal', severity: 'severe', icon: 'exclamationmark.triangle.fill' },
-  { id: 'vomiting', name: 'Vomiting', category: 'gastrointestinal', severity: 'moderate', icon: 'xmark.circle.fill' },
-  { id: 'nausea', name: 'Nausea', category: 'gastrointestinal', severity: 'mild', icon: 'minus.circle.fill' },
-  { id: 'stomach_pain', name: 'Stomach Pain', category: 'gastrointestinal', severity: 'moderate', icon: 'exclamationmark.circle.fill' },
-  { id: 'stomach_cramps', name: 'Stomach Cramps', category: 'gastrointestinal', severity: 'moderate', icon: 'exclamationmark.circle.fill' },
-  { id: 'high_fever', name: 'High Fever (>38.5°C)', category: 'general', severity: 'severe', icon: 'thermometer.medium' },
-  { id: 'fever', name: 'Fever', category: 'general', severity: 'moderate', icon: 'thermometer.medium' },
-  { id: 'headache', name: 'Headache', category: 'neurological', severity: 'mild', icon: 'brain.head.profile' },
-  { id: 'fatigue', name: 'Fatigue', category: 'general', severity: 'mild', icon: 'battery.25percent' },
-  { id: 'weakness', name: 'Weakness', category: 'general', severity: 'moderate', icon: 'battery.0percent' },
-  { id: 'dehydration', name: 'Dehydration', category: 'general', severity: 'severe', icon: 'drop.fill' },
-  { id: 'muscle_cramps', name: 'Muscle Cramps', category: 'general', severity: 'moderate', icon: 'figure.walk' },
-  { id: 'rapid_heartbeat', name: 'Rapid Heartbeat', category: 'general', severity: 'severe', icon: 'heart.fill' },
-  { id: 'loss_appetite', name: 'Loss of Appetite', category: 'general', severity: 'mild', icon: 'minus.circle' },
-  { id: 'jaundice', name: 'Jaundice (Yellow skin/eyes)', category: 'general', severity: 'severe', icon: 'eye.fill' },
-  { id: 'dark_urine', name: 'Dark Urine', category: 'general', severity: 'moderate', icon: 'drop.fill' },
-  { id: 'loose_stools', name: 'Loose Stools', category: 'gastrointestinal', severity: 'mild', icon: 'exclamationmark.circle' },
-  { id: 'gas', name: 'Excessive Gas', category: 'gastrointestinal', severity: 'mild', icon: 'wind' },
-  { id: 'rash', name: 'Skin Rash', category: 'skin', severity: 'mild', icon: 'allergens.fill' },
-  { id: 'joint_pain', name: 'Joint Pain', category: 'general', severity: 'moderate', icon: 'figure.walk' },
-  { id: 'chills', name: 'Chills', category: 'general', severity: 'moderate', icon: 'snowflake' },
-  { id: 'dizziness', name: 'Dizziness', category: 'neurological', severity: 'moderate', icon: 'brain.head.profile' },
-  { id: 'constipation', name: 'Constipation', category: 'gastrointestinal', severity: 'mild', icon: 'exclamationmark.circle' },
-  { id: 'bloating', name: 'Bloating', category: 'gastrointestinal', severity: 'mild', icon: 'circle.fill' }
+  {
+    id: "severe_diarrhea",
+    name: "Severe Diarrhea",
+    category: "gastrointestinal",
+    severity: "severe",
+    icon: "exclamationmark.triangle.fill",
+  },
+  {
+    id: "vomiting",
+    name: "Vomiting",
+    category: "gastrointestinal",
+    severity: "moderate",
+    icon: "xmark.circle.fill",
+  },
+  {
+    id: "nausea",
+    name: "Nausea",
+    category: "gastrointestinal",
+    severity: "mild",
+    icon: "minus.circle.fill",
+  },
+  {
+    id: "stomach_pain",
+    name: "Stomach Pain",
+    category: "gastrointestinal",
+    severity: "moderate",
+    icon: "exclamationmark.circle.fill",
+  },
+  {
+    id: "stomach_cramps",
+    name: "Stomach Cramps",
+    category: "gastrointestinal",
+    severity: "moderate",
+    icon: "exclamationmark.circle.fill",
+  },
+  {
+    id: "high_fever",
+    name: "High Fever (>38.5°C)",
+    category: "general",
+    severity: "severe",
+    icon: "thermometer.medium",
+  },
+  {
+    id: "fever",
+    name: "Fever",
+    category: "general",
+    severity: "moderate",
+    icon: "thermometer.medium",
+  },
+  {
+    id: "headache",
+    name: "Headache",
+    category: "neurological",
+    severity: "mild",
+    icon: "brain.head.profile",
+  },
+  {
+    id: "fatigue",
+    name: "Fatigue",
+    category: "general",
+    severity: "mild",
+    icon: "battery.25percent",
+  },
+  {
+    id: "weakness",
+    name: "Weakness",
+    category: "general",
+    severity: "moderate",
+    icon: "battery.0percent",
+  },
+  {
+    id: "dehydration",
+    name: "Dehydration",
+    category: "general",
+    severity: "severe",
+    icon: "drop.fill",
+  },
+  {
+    id: "muscle_cramps",
+    name: "Muscle Cramps",
+    category: "general",
+    severity: "moderate",
+    icon: "figure.walk",
+  },
+  {
+    id: "rapid_heartbeat",
+    name: "Rapid Heartbeat",
+    category: "general",
+    severity: "severe",
+    icon: "heart.fill",
+  },
+  {
+    id: "loss_appetite",
+    name: "Loss of Appetite",
+    category: "general",
+    severity: "mild",
+    icon: "minus.circle",
+  },
+  {
+    id: "jaundice",
+    name: "Jaundice (Yellow skin/eyes)",
+    category: "general",
+    severity: "severe",
+    icon: "eye.fill",
+  },
+  {
+    id: "dark_urine",
+    name: "Dark Urine",
+    category: "general",
+    severity: "moderate",
+    icon: "drop.fill",
+  },
+  {
+    id: "loose_stools",
+    name: "Loose Stools",
+    category: "gastrointestinal",
+    severity: "mild",
+    icon: "exclamationmark.circle",
+  },
+  {
+    id: "gas",
+    name: "Excessive Gas",
+    category: "gastrointestinal",
+    severity: "mild",
+    icon: "wind",
+  },
+  {
+    id: "rash",
+    name: "Skin Rash",
+    category: "skin",
+    severity: "mild",
+    icon: "allergens.fill",
+  },
+  {
+    id: "joint_pain",
+    name: "Joint Pain",
+    category: "general",
+    severity: "moderate",
+    icon: "figure.walk",
+  },
+  {
+    id: "chills",
+    name: "Chills",
+    category: "general",
+    severity: "moderate",
+    icon: "snowflake",
+  },
+  {
+    id: "dizziness",
+    name: "Dizziness",
+    category: "neurological",
+    severity: "moderate",
+    icon: "brain.head.profile",
+  },
+  {
+    id: "constipation",
+    name: "Constipation",
+    category: "gastrointestinal",
+    severity: "mild",
+    icon: "exclamationmark.circle",
+  },
+  {
+    id: "bloating",
+    name: "Bloating",
+    category: "gastrointestinal",
+    severity: "mild",
+    icon: "circle.fill",
+  },
 ];
 
 export default function AIHealthCheckerScreen() {
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [showQuestionnaire, setShowQuestionnaire] = useState(false);
   const [questionnaire, setQuestionnaire] = useState<SymptomQuestionnaire>({
-    duration: '',
-    severity: '',
-    waterExposure: '',
-    recentTravel: '',
-    additionalInfo: ''
+    duration: "",
+    severity: "",
+    waterExposure: "",
+    recentTravel: "",
+    additionalInfo: "",
   });
   const [assessment, setAssessment] = useState<HealthAssessment | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [assessmentHistory, setAssessmentHistory] = useState<HealthAssessment[]>([]);
+  const [assessmentHistory, setAssessmentHistory] = useState<
+    HealthAssessment[]
+  >([]);
 
   useEffect(() => {
     loadAssessmentHistory();
@@ -97,51 +255,59 @@ export default function AIHealthCheckerScreen() {
 
   const loadAssessmentHistory = async () => {
     try {
-      const history = await AsyncStorage.getItem('aiAssessmentHistory');
+      const history = await AsyncStorage.getItem("aiAssessmentHistory");
       if (history) {
         const parsedHistory = JSON.parse(history).map((item: any) => ({
           ...item,
-          timestamp: new Date(item.timestamp)
+          timestamp: new Date(item.timestamp),
         }));
         setAssessmentHistory(parsedHistory);
       }
     } catch (error) {
-      console.error('Error loading assessment history:', error);
+      console.error("Error loading assessment history:", error);
     }
   };
 
   const saveAssessment = async (newAssessment: HealthAssessment) => {
     try {
       const updatedHistory = [newAssessment, ...assessmentHistory].slice(0, 10);
-      await AsyncStorage.setItem('aiAssessmentHistory', JSON.stringify(updatedHistory));
+      await AsyncStorage.setItem(
+        "aiAssessmentHistory",
+        JSON.stringify(updatedHistory)
+      );
       setAssessmentHistory(updatedHistory);
     } catch (error) {
-      console.error('Error saving assessment:', error);
+      console.error("Error saving assessment:", error);
     }
   };
 
   const toggleSymptom = (symptomId: string) => {
-    setSelectedSymptoms(prev => 
-      prev.includes(symptomId) 
-        ? prev.filter(id => id !== symptomId)
+    setSelectedSymptoms((prev) =>
+      prev.includes(symptomId)
+        ? prev.filter((id) => id !== symptomId)
         : [...prev, symptomId]
     );
   };
 
-  const callOpenAI = async (symptoms: string[], questionnaireData: SymptomQuestionnaire): Promise<AIHealthAssessment> => {
+  const callOpenAI = async (
+    symptoms: string[],
+    questionnaireData: SymptomQuestionnaire
+  ): Promise<AIHealthAssessment> => {
     // Check if API key is available
-    if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your-openai-api-key-here') {
-      throw new Error('OpenAI API key not configured. Please add your API key to the .env file.');
+    if (!OPENAI_API_KEY) {
+      throw new Error(
+        "OpenAI API key not configured. Please add your API key to the .env file."
+      );
     }
 
-    const symptomNames = symptoms.map(id =>
-      SYMPTOMS_LIST.find(s => s.id === id)?.name || id
+    const symptomNames = symptoms.map(
+      (id) => SYMPTOMS_LIST.find((s) => s.id === id)?.name || id
     );
 
     const prompt = `You are a specialized medical AI assistant with expertise in water-borne diseases, waterborne pathogens, and water related health issues.
 
 PATIENT INFORMATION:
-- Symptoms: ${symptomNames.join(', ')}
+- Symptoms: ${symptomNames.join(", ")}
 - Duration: ${questionnaireData.duration}
 - Severity Level: ${questionnaireData.severity}
 - Recent Water Exposure: ${questionnaireData.waterExposure}
@@ -218,100 +384,124 @@ Respond only with the JSON object, no additional text.`;
 
     try {
       const response = await fetch(OPENAI_API_URL, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'gpt-4',
+          model: "gpt-4o-mini",
           messages: [
             {
-              role: 'system',
-              content: 'You are a helpful medical AI assistant. Provide health assessments in the exact JSON format requested. Always be responsible and emphasize the need for professional medical consultation.'
+              role: "system",
+              content:
+                "You are a helpful medical AI assistant specializing in water-borne diseases. Provide health assessments in the exact JSON format requested. Always be responsible and emphasize the need for professional medical consultation.",
             },
             {
-              role: 'user',
-              content: prompt
-            }
+              role: "user",
+              content: prompt,
+            },
           ],
           temperature: 0.3,
-          max_tokens: 1500
-        })
+          max_tokens: 2000,
+        }),
       });
 
       if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status}`);
+        const errorText = await response.text();
+        console.error("OpenAI API Error:", {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText,
+        });
+        throw new Error(`OpenAI API error: ${response.status} - ${response.statusText}`);
       }
 
       const data = await response.json();
-      const aiResponse = data.choices[0].message.content;
       
-      // Parse the JSON response
-      const assessment = JSON.parse(aiResponse);
-      return assessment;
+      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+        throw new Error("Invalid response format from OpenAI API");
+      }
 
+      const aiResponse = data.choices[0].message.content;
+
+      // Clean the response to ensure it's valid JSON
+      let cleanedResponse = aiResponse.trim();
+      if (cleanedResponse.startsWith('```json')) {
+        cleanedResponse = cleanedResponse.replace(/```json\n?/, '').replace(/\n?```$/, '');
+      }
+
+      // Parse the JSON response
+      const assessment = JSON.parse(cleanedResponse);
+      return assessment;
     } catch (error) {
-      console.error('OpenAI API error:', error);
-      
+      console.error("OpenAI API error:", error);
+
       // Enhanced fallback assessment focused on water-borne diseases
       return {
         possibleConditions: [
           {
-            name: 'Water-borne Gastrointestinal Infection',
+            name: "Water-borne Gastrointestinal Infection",
             probability: 75,
-            description: 'Possible infection from contaminated water or food, commonly caused by bacteria, viruses, or parasites found in unsafe water sources.',
-            severity: 'medium',
-            commonDuration: '3-7 days with proper treatment',
-            waterSource: 'Contaminated drinking water, recreational water, or food prepared with unsafe water'
+            description:
+              "Possible infection from contaminated water or food, commonly caused by bacteria, viruses, or parasites found in unsafe water sources.",
+            severity: "medium",
+            commonDuration: "3-7 days with proper treatment",
+            waterSource:
+              "Contaminated drinking water, recreational water, or food prepared with unsafe water",
           },
           {
-            name: 'Acute Gastroenteritis',
+            name: "Acute Gastroenteritis",
             probability: 60,
-            description: 'Inflammation of stomach and intestines, often caused by waterborne pathogens like E. coli, Salmonella, or Norovirus.',
-            severity: 'medium',
-            commonDuration: '2-5 days',
-            waterSource: 'Contaminated water supply or cross-contamination'
-          }
+            description:
+              "Inflammation of stomach and intestines, often caused by waterborne pathogens like E. coli, Salmonella, or Norovirus.",
+            severity: "medium",
+            commonDuration: "2-5 days",
+            waterSource: "Contaminated water supply or cross-contamination",
+          },
         ],
-        riskLevel: 'medium' as const,
+        riskLevel: "medium" as const,
         homeRemedies: [
-          '💧 Oral Rehydration Solution (ORS): Mix 1 tsp salt + 2 tbsp sugar in 1 liter boiled water',
-          '🔥 Boil all drinking water for at least 1 minute before consumption',
-          '🍵 Ginger tea or chamomile tea to soothe stomach and reduce nausea',
-          '🍌 BRAT diet: Bananas, Rice, Applesauce, Toast for easy digestion',
-          '🧂 Electrolyte replacement: Coconut water or homemade electrolyte solution',
-          '🌿 Probiotics from plain yogurt (if tolerated) to restore gut bacteria'
+          "💧 Oral Rehydration Solution (ORS): Mix 1 tsp salt + 2 tbsp sugar in 1 liter boiled water",
+          "🔥 Boil all drinking water for at least 1 minute before consumption",
+          "🍵 Ginger tea or chamomile tea to soothe stomach and reduce nausea",
+          "🍌 BRAT diet: Bananas, Rice, Applesauce, Toast for easy digestion",
+          "🧂 Electrolyte replacement: Coconut water or homemade electrolyte solution",
+          "🌿 Probiotics from plain yogurt (if tolerated) to restore gut bacteria",
         ],
         whenToSeekHelp: [
-          '🚨 IMMEDIATE: Signs of severe dehydration (dizziness, dry mouth, no urination for 8+ hours)',
-          '⚠️ URGENT: High fever above 39°C (102°F) lasting more than 24 hours',
-          '🩸 URGENT: Blood or mucus in stool or vomit',
-          '⏰ If symptoms persist or worsen after 48-72 hours of home treatment',
-          '🤒 Severe abdominal pain or signs of complications'
+          "🚨 IMMEDIATE: Signs of severe dehydration (dizziness, dry mouth, no urination for 8+ hours)",
+          "⚠️ URGENT: High fever above 39°C (102°F) lasting more than 24 hours",
+          "🩸 URGENT: Blood or mucus in stool or vomit",
+          "⏰ If symptoms persist or worsen after 48-72 hours of home treatment",
+          "🤒 Severe abdominal pain or signs of complications",
         ],
         generalAdvice: [
-          '🚰 Water Safety: Only drink boiled, bottled, or properly treated water',
-          '🧼 Hand Hygiene: Wash hands frequently with soap for 20+ seconds',
-          '🍎 Food Safety: Avoid raw foods, street food, and unpeeled fruits',
-          '🏠 Rest and avoid strenuous activities to conserve energy',
-          '📊 Monitor symptoms: Track bowel movements and fluid intake',
-          '🌡️ Temperature monitoring: Check fever regularly'
+          "🚰 Water Safety: Only drink boiled, bottled, or properly treated water",
+          "🧼 Hand Hygiene: Wash hands frequently with soap for 20+ seconds",
+          "🍎 Food Safety: Avoid raw foods, street food, and unpeeled fruits",
+          "🏠 Rest and avoid strenuous activities to conserve energy",
+          "📊 Monitor symptoms: Track bowel movements and fluid intake",
+          "🌡️ Temperature monitoring: Check fever regularly",
         ],
         preventionTips: [
-          '💧 Water purification: Use water purification tablets or boiling',
-          '🧊 Avoid ice cubes from unknown water sources',
-          '🥗 Eat only thoroughly cooked hot foods',
-          '🏊 Avoid swimming in potentially contaminated water bodies'
+          "💧 Water purification: Use water purification tablets or boiling",
+          "🧊 Avoid ice cubes from unknown water sources",
+          "🥗 Eat only thoroughly cooked hot foods",
+          "🏊 Avoid swimming in potentially contaminated water bodies",
         ],
-        disclaimer: 'This AI assessment focuses on water-related health issues and is for informational purposes only. It cannot replace professional medical diagnosis. Seek immediate medical attention for severe symptoms or if you suspect serious water-borne illness.'
+        disclaimer:
+          "This AI assessment focuses on water-related health issues and is for informational purposes only. It cannot replace professional medical diagnosis. Seek immediate medical attention for severe symptoms or if you suspect serious water-borne illness.",
       };
     }
   };
 
   const proceedToQuestionnaire = () => {
     if (selectedSymptoms.length === 0) {
-      Alert.alert('No Symptoms Selected', 'Please select at least one symptom to analyze.');
+      Alert.alert(
+        "No Symptoms Selected",
+        "Please select at least one symptom to analyze."
+      );
       return;
     }
     setShowQuestionnaire(true);
@@ -319,20 +509,23 @@ Respond only with the JSON object, no additional text.`;
 
   const analyzeSymptoms = async () => {
     if (!questionnaire.duration || !questionnaire.severity) {
-      Alert.alert('Incomplete Information', 'Please fill in at least the duration and severity of your symptoms.');
+      Alert.alert(
+        "Incomplete Information",
+        "Please fill in at least the duration and severity of your symptoms."
+      );
       return;
     }
 
     setIsAnalyzing(true);
-    
+
     try {
       const aiAssessment = await callOpenAI(selectedSymptoms, questionnaire);
-      
+
       const newAssessment: HealthAssessment = {
         selectedSymptoms,
         questionnaire,
         aiAssessment,
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
       setAssessment(newAssessment);
@@ -340,8 +533,11 @@ Respond only with the JSON object, no additional text.`;
       setShowResults(true);
       saveAssessment(newAssessment);
     } catch (error) {
-      Alert.alert('Analysis Error', 'Failed to analyze symptoms. Please try again.');
-      console.error('Analysis error:', error);
+      console.error("Analysis error:", error);
+      Alert.alert(
+        "Analysis Error",
+        "Failed to analyze symptoms. Please check your internet connection and try again."
+      );
     } finally {
       setIsAnalyzing(false);
     }
@@ -349,24 +545,28 @@ Respond only with the JSON object, no additional text.`;
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case 'severe': 
-      case 'high': return '#F44336';
-      case 'moderate': 
-      case 'medium': return '#FF9800';
-      case 'mild': 
-      case 'low': return '#4CAF50';
-      default: return '#757575';
+      case "severe":
+      case "high":
+        return "#F44336";
+      case "moderate":
+      case "medium":
+        return "#FF9800";
+      case "mild":
+      case "low":
+        return "#4CAF50";
+      default:
+        return "#757575";
     }
   };
 
   const resetAssessment = () => {
     setSelectedSymptoms([]);
     setQuestionnaire({
-      duration: '',
-      severity: '',
-      waterExposure: '',
-      recentTravel: '',
-      additionalInfo: ''
+      duration: "",
+      severity: "",
+      waterExposure: "",
+      recentTravel: "",
+      additionalInfo: "",
     });
     setShowQuestionnaire(false);
     setAssessment(null);
@@ -374,16 +574,18 @@ Respond only with the JSON object, no additional text.`;
   };
 
   const getProbabilityColor = (probability: number) => {
-    if (probability >= 70) return '#F44336';
-    if (probability >= 40) return '#FF9800';
-    return '#4CAF50';
+    if (probability >= 70) return "#F44336";
+    if (probability >= 40) return "#FF9800";
+    return "#4CAF50";
   };
 
   return (
     <ScrollView style={styles.container}>
       <ThemedView style={styles.header}>
         <IconSymbol name="brain.head.profile" size={32} color="white" />
-        <ThemedText type="title" style={styles.headerTitle}>AI Health Assistant</ThemedText>
+        <ThemedText type="title" style={styles.headerTitle}>
+          AI Health Assistant
+        </ThemedText>
         <ThemedText type="subtitle" style={styles.headerSubtitle}>
           Intelligent symptom analysis with home care guidance
         </ThemedText>
@@ -400,7 +602,8 @@ Respond only with the JSON object, no additional text.`;
               </ThemedText>
             </View>
             <ThemedText style={styles.instruction}>
-              Choose all symptoms you're currently experiencing. The AI will analyze patterns and provide personalized guidance.
+              Choose all symptoms you're currently experiencing. The AI will
+              analyze patterns and provide personalized guidance.
             </ThemedText>
 
             <View style={styles.symptomsGrid}>
@@ -409,20 +612,28 @@ Respond only with the JSON object, no additional text.`;
                   key={symptom.id}
                   style={[
                     styles.symptomButton,
-                    selectedSymptoms.includes(symptom.id) && styles.selectedSymptom,
-                    { borderColor: getSeverityColor(symptom.severity) }
+                    selectedSymptoms.includes(symptom.id) &&
+                      styles.selectedSymptom,
+                    { borderColor: getSeverityColor(symptom.severity) },
                   ]}
                   onPress={() => toggleSymptom(symptom.id)}
                 >
                   <IconSymbol
                     name={symptom.icon as any}
                     size={20}
-                    color={selectedSymptoms.includes(symptom.id) ? 'white' : getSeverityColor(symptom.severity)}
+                    color={
+                      selectedSymptoms.includes(symptom.id)
+                        ? "white"
+                        : getSeverityColor(symptom.severity)
+                    }
                   />
-                  <ThemedText style={[
-                    styles.symptomText,
-                    selectedSymptoms.includes(symptom.id) && styles.selectedSymptomText
-                  ]}>
+                  <ThemedText
+                    style={[
+                      styles.symptomText,
+                      selectedSymptoms.includes(symptom.id) &&
+                        styles.selectedSymptomText,
+                    ]}
+                  >
                     {symptom.name}
                   </ThemedText>
                 </TouchableOpacity>
@@ -439,11 +650,18 @@ Respond only with the JSON object, no additional text.`;
           {/* Analyze Button */}
           <ThemedView style={styles.card}>
             <TouchableOpacity
-              style={[styles.analyzeButton, selectedSymptoms.length === 0 && styles.disabledButton]}
+              style={[
+                styles.analyzeButton,
+                selectedSymptoms.length === 0 && styles.disabledButton,
+              ]}
               onPress={proceedToQuestionnaire}
               disabled={selectedSymptoms.length === 0}
             >
-              <IconSymbol name="arrow.right.circle.fill" size={24} color="white" />
+              <IconSymbol
+                name="arrow.right.circle.fill"
+                size={24}
+                color="white"
+              />
               <ThemedText style={styles.analyzeButtonText}>
                 Continue to Health Questions
               </ThemedText>
@@ -455,26 +673,54 @@ Respond only with the JSON object, no additional text.`;
           {/* Health Questionnaire */}
           <ThemedView style={styles.card}>
             <View style={styles.cardHeader}>
-              <IconSymbol name="questionmark.circle.fill" size={24} color="#E91E63" />
+              <IconSymbol
+                name="questionmark.circle.fill"
+                size={24}
+                color="#E91E63"
+              />
               <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
                 Health Information
               </ThemedText>
             </View>
             <ThemedText style={styles.instruction}>
-              Please provide additional information to help our AI give you more accurate analysis.
+              Please provide additional information to help our AI give you more
+              accurate analysis.
             </ThemedText>
 
             {/* Duration */}
             <View style={styles.questionContainer}>
-              <ThemedText style={styles.questionLabel}>How long have you been experiencing these symptoms?</ThemedText>
+              <ThemedText style={styles.questionLabel}>
+                How long have you been experiencing these symptoms?
+              </ThemedText>
               <View style={styles.optionsContainer}>
-                {['Less than 24 hours', '1-3 days', '4-7 days', 'More than a week', 'More than a month'].map((option) => (
+                {[
+                  "Less than 24 hours",
+                  "1-3 days",
+                  "4-7 days",
+                  "More than a week",
+                  "More than a month",
+                ].map((option) => (
                   <TouchableOpacity
                     key={option}
-                    style={[styles.optionButton, questionnaire.duration === option && styles.selectedOption]}
-                    onPress={() => setQuestionnaire(prev => ({ ...prev, duration: option }))}
+                    style={[
+                      styles.optionButton,
+                      questionnaire.duration === option &&
+                        styles.selectedOption,
+                    ]}
+                    onPress={() =>
+                      setQuestionnaire((prev) => ({
+                        ...prev,
+                        duration: option,
+                      }))
+                    }
                   >
-                    <ThemedText style={[styles.optionText, questionnaire.duration === option && styles.selectedOptionText]}>
+                    <ThemedText
+                      style={[
+                        styles.optionText,
+                        questionnaire.duration === option &&
+                          styles.selectedOptionText,
+                      ]}
+                    >
                       {option}
                     </ThemedText>
                   </TouchableOpacity>
@@ -484,15 +730,37 @@ Respond only with the JSON object, no additional text.`;
 
             {/* Severity */}
             <View style={styles.questionContainer}>
-              <ThemedText style={styles.questionLabel}>How would you rate the severity of your symptoms?</ThemedText>
+              <ThemedText style={styles.questionLabel}>
+                How would you rate the severity of your symptoms?
+              </ThemedText>
               <View style={styles.optionsContainer}>
-                {['Mild (manageable)', 'Moderate (concerning)', 'Severe (very uncomfortable)', 'Critical (unbearable)'].map((option) => (
+                {[
+                  "Mild (manageable)",
+                  "Moderate (concerning)",
+                  "Severe (very uncomfortable)",
+                  "Critical (unbearable)",
+                ].map((option) => (
                   <TouchableOpacity
                     key={option}
-                    style={[styles.optionButton, questionnaire.severity === option && styles.selectedOption]}
-                    onPress={() => setQuestionnaire(prev => ({ ...prev, severity: option }))}
+                    style={[
+                      styles.optionButton,
+                      questionnaire.severity === option &&
+                        styles.selectedOption,
+                    ]}
+                    onPress={() =>
+                      setQuestionnaire((prev) => ({
+                        ...prev,
+                        severity: option,
+                      }))
+                    }
                   >
-                    <ThemedText style={[styles.optionText, questionnaire.severity === option && styles.selectedOptionText]}>
+                    <ThemedText
+                      style={[
+                        styles.optionText,
+                        questionnaire.severity === option &&
+                          styles.selectedOptionText,
+                      ]}
+                    >
                       {option}
                     </ThemedText>
                   </TouchableOpacity>
@@ -502,15 +770,39 @@ Respond only with the JSON object, no additional text.`;
 
             {/* Water Exposure */}
             <View style={styles.questionContainer}>
-              <ThemedText style={styles.questionLabel}>Have you recently consumed water from any of these sources?</ThemedText>
+              <ThemedText style={styles.questionLabel}>
+                Have you recently consumed water from any of these sources?
+              </ThemedText>
               <View style={styles.optionsContainer}>
-                {['Tap water', 'Well water', 'Bottled water', 'River/lake water', 'Street vendor water', 'No unusual water consumption'].map((option) => (
+                {[
+                  "Tap water",
+                  "Well water",
+                  "Bottled water",
+                  "River/lake water",
+                  "Street vendor water",
+                  "No unusual water consumption",
+                ].map((option) => (
                   <TouchableOpacity
                     key={option}
-                    style={[styles.optionButton, questionnaire.waterExposure === option && styles.selectedOption]}
-                    onPress={() => setQuestionnaire(prev => ({ ...prev, waterExposure: option }))}
+                    style={[
+                      styles.optionButton,
+                      questionnaire.waterExposure === option &&
+                        styles.selectedOption,
+                    ]}
+                    onPress={() =>
+                      setQuestionnaire((prev) => ({
+                        ...prev,
+                        waterExposure: option,
+                      }))
+                    }
                   >
-                    <ThemedText style={[styles.optionText, questionnaire.waterExposure === option && styles.selectedOptionText]}>
+                    <ThemedText
+                      style={[
+                        styles.optionText,
+                        questionnaire.waterExposure === option &&
+                          styles.selectedOptionText,
+                      ]}
+                    >
                       {option}
                     </ThemedText>
                   </TouchableOpacity>
@@ -520,15 +812,39 @@ Respond only with the JSON object, no additional text.`;
 
             {/* Recent Travel */}
             <View style={styles.questionContainer}>
-              <ThemedText style={styles.questionLabel}>Have you traveled recently or eaten outside food?</ThemedText>
+              <ThemedText style={styles.questionLabel}>
+                Have you traveled recently or eaten outside food?
+              </ThemedText>
               <View style={styles.optionsContainer}>
-                {['No recent travel or outside food', 'Traveled within country', 'International travel', 'Ate street food', 'Ate at restaurants', 'Attended events/gatherings'].map((option) => (
+                {[
+                  "No recent travel or outside food",
+                  "Traveled within country",
+                  "International travel",
+                  "Ate street food",
+                  "Ate at restaurants",
+                  "Attended events/gatherings",
+                ].map((option) => (
                   <TouchableOpacity
                     key={option}
-                    style={[styles.optionButton, questionnaire.recentTravel === option && styles.selectedOption]}
-                    onPress={() => setQuestionnaire(prev => ({ ...prev, recentTravel: option }))}
+                    style={[
+                      styles.optionButton,
+                      questionnaire.recentTravel === option &&
+                        styles.selectedOption,
+                    ]}
+                    onPress={() =>
+                      setQuestionnaire((prev) => ({
+                        ...prev,
+                        recentTravel: option,
+                      }))
+                    }
                   >
-                    <ThemedText style={[styles.optionText, questionnaire.recentTravel === option && styles.selectedOptionText]}>
+                    <ThemedText
+                      style={[
+                        styles.optionText,
+                        questionnaire.recentTravel === option &&
+                          styles.selectedOptionText,
+                      ]}
+                    >
                       {option}
                     </ThemedText>
                   </TouchableOpacity>
@@ -538,23 +854,40 @@ Respond only with the JSON object, no additional text.`;
 
             {/* Action Buttons */}
             <View style={styles.questionnaireButtons}>
-              <TouchableOpacity style={styles.backButton} onPress={() => setShowQuestionnaire(false)}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => setShowQuestionnaire(false)}
+              >
                 <IconSymbol name="arrow.left" size={20} color="#2196F3" />
                 <ThemedText style={styles.backButtonText}>Back</ThemedText>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
-                style={[styles.analyzeButton, (!questionnaire.duration || !questionnaire.severity || isAnalyzing) && styles.disabledButton]}
+                style={[
+                  styles.analyzeButton,
+                  (!questionnaire.duration ||
+                    !questionnaire.severity ||
+                    isAnalyzing) &&
+                    styles.disabledButton,
+                ]}
                 onPress={analyzeSymptoms}
-                disabled={!questionnaire.duration || !questionnaire.severity || isAnalyzing}
+                disabled={
+                  !questionnaire.duration ||
+                  !questionnaire.severity ||
+                  isAnalyzing
+                }
               >
                 {isAnalyzing ? (
                   <ActivityIndicator size="small" color="white" />
                 ) : (
-                  <IconSymbol name="brain.head.profile" size={24} color="white" />
+                  <IconSymbol
+                    name="brain.head.profile"
+                    size={24}
+                    color="white"
+                  />
                 )}
                 <ThemedText style={styles.analyzeButtonText}>
-                  {isAnalyzing ? 'Analyzing with AI...' : 'Get AI Analysis'}
+                  {isAnalyzing ? "Analyzing with AI..." : "Get AI Analysis"}
                 </ThemedText>
               </TouchableOpacity>
             </View>
@@ -563,23 +896,46 @@ Respond only with the JSON object, no additional text.`;
       ) : (
         <>
           {/* AI Assessment Results */}
-          <ThemedView style={[styles.card, { borderLeftColor: getSeverityColor(assessment?.aiAssessment?.riskLevel || 'low') }]}>
+          <ThemedView
+            style={[
+              styles.card,
+              {
+                borderLeftColor: getSeverityColor(
+                  assessment?.aiAssessment?.riskLevel || "low"
+                ),
+              },
+            ]}
+          >
             <View style={styles.resultHeader}>
               <IconSymbol
                 name="brain.head.profile"
                 size={32}
-                color={getSeverityColor(assessment?.aiAssessment?.riskLevel || 'low')}
+                color={getSeverityColor(
+                  assessment?.aiAssessment?.riskLevel || "low"
+                )}
               />
               <View style={styles.resultHeaderText}>
-                <ThemedText type="defaultSemiBold">AI Analysis Complete</ThemedText>
-                <ThemedText style={[styles.riskLevel, { color: getSeverityColor(assessment?.aiAssessment?.riskLevel || 'low') }]}>
+                <ThemedText type="defaultSemiBold">
+                  AI Analysis Complete
+                </ThemedText>
+                <ThemedText
+                  style={[
+                    styles.riskLevel,
+                    {
+                      color: getSeverityColor(
+                        assessment?.aiAssessment?.riskLevel || "low"
+                      ),
+                    },
+                  ]}
+                >
                   {assessment?.aiAssessment?.riskLevel.toUpperCase()} RISK LEVEL
                 </ThemedText>
               </View>
             </View>
 
             <ThemedText style={styles.disclaimer}>
-              {assessment?.aiAssessment?.disclaimer || '⚠️ This is an AI-based preliminary assessment. Always consult healthcare professionals for proper diagnosis and treatment.'}
+              {assessment?.aiAssessment?.disclaimer ||
+                "⚠️ This is an AI-based preliminary assessment. Always consult healthcare professionals for proper diagnosis and treatment."}
             </ThemedText>
           </ThemedView>
 
@@ -587,40 +943,80 @@ Respond only with the JSON object, no additional text.`;
           {assessment?.aiAssessment?.possibleConditions && (
             <ThemedView style={styles.card}>
               <View style={styles.cardHeader}>
-                <IconSymbol name="heart.text.square" size={24} color="#E91E63" />
+                <IconSymbol
+                  name="heart.text.square"
+                  size={24}
+                  color="#E91E63"
+                />
                 <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
                   Possible Conditions
                 </ThemedText>
               </View>
-              
-              {assessment.aiAssessment.possibleConditions.map((condition, index) => (
-                <View key={index} style={styles.conditionItem}>
-                  <View style={styles.conditionHeader}>
-                    <ThemedText type="defaultSemiBold">{condition.name}</ThemedText>
-                    <View style={styles.probabilityContainer}>
-                      <View style={[styles.probabilityBadge, { backgroundColor: getProbabilityColor(condition.probability) }]}>
-                        <ThemedText style={styles.probabilityText}>{condition.probability}%</ThemedText>
-                      </View>
-                      <View style={[styles.severityBadge, { backgroundColor: getSeverityColor(condition.severity) }]}>
-                        <ThemedText style={styles.severityText}>{condition.severity}</ThemedText>
+
+              {assessment.aiAssessment.possibleConditions.map(
+                (condition, index) => (
+                  <View key={index} style={styles.conditionItem}>
+                    <View style={styles.conditionHeader}>
+                      <ThemedText type="defaultSemiBold">
+                        {condition.name}
+                      </ThemedText>
+                      <View style={styles.probabilityContainer}>
+                        <View
+                          style={[
+                            styles.probabilityBadge,
+                            {
+                              backgroundColor: getProbabilityColor(
+                                condition.probability
+                              ),
+                            },
+                          ]}
+                        >
+                          <ThemedText style={styles.probabilityText}>
+                            {condition.probability}%
+                          </ThemedText>
+                        </View>
+                        <View
+                          style={[
+                            styles.severityBadge,
+                            {
+                              backgroundColor: getSeverityColor(
+                                condition.severity
+                              ),
+                            },
+                          ]}
+                        >
+                          <ThemedText style={styles.severityText}>
+                            {condition.severity}
+                          </ThemedText>
+                        </View>
                       </View>
                     </View>
+                    <ThemedText style={styles.conditionDescription}>
+                      {condition.description}
+                    </ThemedText>
+                    {condition.commonDuration && (
+                      <View style={styles.conditionDetail}>
+                        <IconSymbol name="clock" size={16} color="#757575" />
+                        <ThemedText style={styles.conditionDetailText}>
+                          Duration: {condition.commonDuration}
+                        </ThemedText>
+                      </View>
+                    )}
+                    {condition.waterSource && (
+                      <View style={styles.conditionDetail}>
+                        <IconSymbol
+                          name="drop.fill"
+                          size={16}
+                          color="#2196F3"
+                        />
+                        <ThemedText style={styles.conditionDetailText}>
+                          Source: {condition.waterSource}
+                        </ThemedText>
+                      </View>
+                    )}
                   </View>
-                  <ThemedText style={styles.conditionDescription}>{condition.description}</ThemedText>
-                  {condition.commonDuration && (
-                    <View style={styles.conditionDetail}>
-                      <IconSymbol name="clock" size={16} color="#757575" />
-                      <ThemedText style={styles.conditionDetailText}>Duration: {condition.commonDuration}</ThemedText>
-                    </View>
-                  )}
-                  {condition.waterSource && (
-                    <View style={styles.conditionDetail}>
-                      <IconSymbol name="drop.fill" size={16} color="#2196F3" />
-                      <ThemedText style={styles.conditionDetailText}>Source: {condition.waterSource}</ThemedText>
-                    </View>
-                  )}
-                </View>
-              ))}
+                )
+              )}
             </ThemedView>
           )}
 
@@ -633,7 +1029,7 @@ Respond only with the JSON object, no additional text.`;
                   Home Remedies & Self-Care
                 </ThemedText>
               </View>
-              
+
               {assessment.aiAssessment.homeRemedies.map((remedy, index) => (
                 <View key={index} style={styles.remedyItem}>
                   <ThemedText style={styles.remedyText}>{remedy}</ThemedText>
@@ -646,12 +1042,16 @@ Respond only with the JSON object, no additional text.`;
           {assessment?.aiAssessment?.whenToSeekHelp && (
             <ThemedView style={styles.card}>
               <View style={styles.cardHeader}>
-                <IconSymbol name="exclamationmark.triangle.fill" size={24} color="#F44336" />
+                <IconSymbol
+                  name="exclamationmark.triangle.fill"
+                  size={24}
+                  color="#F44336"
+                />
                 <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
                   When to Seek Medical Help
                 </ThemedText>
               </View>
-              
+
               {assessment.aiAssessment.whenToSeekHelp.map((warning, index) => (
                 <View key={index} style={styles.warningItem}>
                   <ThemedText style={styles.warningText}>{warning}</ThemedText>
@@ -669,7 +1069,7 @@ Respond only with the JSON object, no additional text.`;
                   General Health Tips
                 </ThemedText>
               </View>
-              
+
               {assessment.aiAssessment.generalAdvice.map((advice, index) => (
                 <View key={index} style={styles.adviceItem}>
                   <ThemedText style={styles.adviceText}>{advice}</ThemedText>
@@ -687,7 +1087,7 @@ Respond only with the JSON object, no additional text.`;
                   Prevention & Water Safety
                 </ThemedText>
               </View>
-              
+
               {assessment.aiAssessment.preventionTips.map((tip, index) => (
                 <View key={index} style={styles.preventionItem}>
                   <ThemedText style={styles.preventionText}>{tip}</ThemedText>
@@ -699,14 +1099,25 @@ Respond only with the JSON object, no additional text.`;
           {/* Action Buttons */}
           <ThemedView style={styles.card}>
             <View style={styles.actionButtons}>
-              <TouchableOpacity style={styles.secondaryButton} onPress={resetAssessment}>
-                <IconSymbol name="arrow.counterclockwise" size={20} color="#2196F3" />
-                <ThemedText style={styles.secondaryButtonText}>New Assessment</ThemedText>
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={resetAssessment}
+              >
+                <IconSymbol
+                  name="arrow.counterclockwise"
+                  size={20}
+                  color="#2196F3"
+                />
+                <ThemedText style={styles.secondaryButtonText}>
+                  New Assessment
+                </ThemedText>
               </TouchableOpacity>
-              
+
               <TouchableOpacity style={styles.primaryButton}>
                 <IconSymbol name="phone.fill" size={20} color="white" />
-                <ThemedText style={styles.primaryButtonText}>Emergency Call</ThemedText>
+                <ThemedText style={styles.primaryButtonText}>
+                  Emergency Call
+                </ThemedText>
               </TouchableOpacity>
             </View>
           </ThemedView>
@@ -722,17 +1133,31 @@ Respond only with the JSON object, no additional text.`;
               Recent AI Assessments
             </ThemedText>
           </View>
-          
+
           {assessmentHistory.slice(0, 3).map((hist, index) => (
             <View key={index} style={styles.historyItem}>
               <View style={styles.historyHeader}>
-                <View style={[styles.riskIndicator, { backgroundColor: getSeverityColor(hist.aiAssessment?.riskLevel || 'low') }]} />
+                <View
+                  style={[
+                    styles.riskIndicator,
+                    {
+                      backgroundColor: getSeverityColor(
+                        hist.aiAssessment?.riskLevel || "low"
+                      ),
+                    },
+                  ]}
+                />
                 <ThemedText style={styles.historyDate}>
-                  {hist.timestamp.toLocaleDateString()} at {hist.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {hist.timestamp.toLocaleDateString()} at{" "}
+                  {hist.timestamp.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </ThemedText>
               </View>
               <ThemedText style={styles.historySymptoms}>
-                {hist.selectedSymptoms.length} symptoms • {hist.aiAssessment?.riskLevel || 'unknown'} risk
+                {hist.selectedSymptoms.length} symptoms •{" "}
+                {hist.aiAssessment?.riskLevel || "unknown"} risk
               </ThemedText>
             </View>
           ))}
@@ -745,108 +1170,108 @@ Respond only with the JSON object, no additional text.`;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#f5f5f5",
   },
   header: {
     padding: 24,
     paddingTop: 64,
-    alignItems: 'center',
-    backgroundColor: '#E91E63',
+    alignItems: "center",
+    backgroundColor: "#E91E63",
     marginBottom: 20,
   },
   headerTitle: {
-    color: 'white',
+    color: "white",
     marginTop: 8,
   },
   headerSubtitle: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
+    color: "rgba(255, 255, 255, 0.8)",
+    textAlign: "center",
     marginTop: 4,
   },
   card: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     marginHorizontal: 16,
     marginBottom: 16,
     padding: 16,
     borderRadius: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#E91E63',
-    shadowColor: '#000',
+    borderLeftColor: "#E91E63",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
   cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 18,
     marginLeft: 8,
-    color: '#333',
+    color: "#333",
   },
   instruction: {
-    color: '#757575',
+    color: "#757575",
     marginBottom: 16,
     lineHeight: 20,
   },
   symptomsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   symptomButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 12,
     borderRadius: 8,
     borderWidth: 2,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
     marginBottom: 8,
-    minWidth: '48%',
+    minWidth: "48%",
   },
   selectedSymptom: {
-    backgroundColor: '#2196F3',
+    backgroundColor: "#2196F3",
   },
   symptomText: {
     marginLeft: 8,
     fontSize: 14,
     flex: 1,
-    color: '#333',
+    color: "#333",
   },
   selectedSymptomText: {
-    color: 'white',
+    color: "white",
   },
   selectedCount: {
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 16,
   },
   countText: {
-    color: '#757575',
+    color: "#757575",
     fontSize: 14,
   },
   analyzeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#E91E63',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E91E63",
     padding: 16,
     borderRadius: 8,
   },
   disabledButton: {
-    backgroundColor: '#ccc',
+    backgroundColor: "#ccc",
   },
   analyzeButtonText: {
-    color: 'white',
+    color: "white",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginLeft: 8,
   },
   resultHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 16,
   },
   resultHeaderText: {
@@ -855,30 +1280,30 @@ const styles = StyleSheet.create({
   },
   riskLevel: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   disclaimer: {
-    backgroundColor: '#fff3cd',
+    backgroundColor: "#fff3cd",
     padding: 12,
     borderRadius: 8,
-    color: '#856404',
+    color: "#856404",
     fontSize: 14,
     lineHeight: 18,
   },
   conditionItem: {
     marginBottom: 16,
     padding: 12,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
     borderRadius: 8,
   },
   conditionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 8,
   },
   probabilityContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
   },
   probabilityBadge: {
@@ -887,9 +1312,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   probabilityText: {
-    color: 'white',
+    color: "white",
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   severityBadge: {
     paddingHorizontal: 8,
@@ -897,13 +1322,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   severityText: {
-    color: 'white',
+    color: "white",
     fontSize: 12,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
+    fontWeight: "bold",
+    textTransform: "uppercase",
   },
   conditionDescription: {
-    color: '#555555',
+    color: "#555555",
     lineHeight: 18,
     fontSize: 14,
   },
@@ -913,8 +1338,8 @@ const styles = StyleSheet.create({
   remedyText: {
     fontSize: 16,
     lineHeight: 22,
-    color: '#222222',
-    fontWeight: '400',
+    color: "#222222",
+    fontWeight: "400",
   },
   warningItem: {
     marginBottom: 8,
@@ -922,8 +1347,8 @@ const styles = StyleSheet.create({
   warningText: {
     fontSize: 16,
     lineHeight: 22,
-    color: '#D32F2F',
-    fontWeight: '500',
+    color: "#D32F2F",
+    fontWeight: "500",
   },
   adviceItem: {
     marginBottom: 8,
@@ -931,21 +1356,21 @@ const styles = StyleSheet.create({
   adviceText: {
     fontSize: 16,
     lineHeight: 22,
-    color: '#222222',
-    fontWeight: '400',
+    color: "#222222",
+    fontWeight: "400",
   },
   questionContainer: {
     marginBottom: 20,
   },
   questionLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333333',
+    fontWeight: "600",
+    color: "#333333",
     marginBottom: 12,
   },
   optionsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   optionButton: {
@@ -953,86 +1378,86 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    backgroundColor: '#F8F9FA',
+    borderColor: "#E0E0E0",
+    backgroundColor: "#F8F9FA",
     marginBottom: 8,
   },
   selectedOption: {
-    backgroundColor: '#E91E63',
-    borderColor: '#E91E63',
+    backgroundColor: "#E91E63",
+    borderColor: "#E91E63",
   },
   optionText: {
     fontSize: 14,
-    color: '#333333',
+    color: "#333333",
   },
   selectedOptionText: {
-    color: 'white',
-    fontWeight: '500',
+    color: "white",
+    fontWeight: "500",
   },
   questionnaireButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginTop: 20,
   },
   backButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F8F9FA',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F8F9FA",
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#2196F3',
+    borderColor: "#2196F3",
   },
   backButtonText: {
-    color: '#2196F3',
-    fontWeight: 'bold',
+    color: "#2196F3",
+    fontWeight: "bold",
     marginLeft: 8,
   },
   actionButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   primaryButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#E91E63',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E91E63",
     padding: 12,
     borderRadius: 8,
   },
   primaryButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: "white",
+    fontWeight: "bold",
     marginLeft: 8,
   },
   secondaryButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f8f9fa',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f8f9fa",
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#2196F3',
+    borderColor: "#2196F3",
   },
   secondaryButtonText: {
-    color: '#2196F3',
-    fontWeight: 'bold',
+    color: "#2196F3",
+    fontWeight: "bold",
     marginLeft: 8,
   },
   historyItem: {
     marginBottom: 12,
     padding: 12,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
     borderRadius: 8,
   },
   historyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 4,
   },
   riskIndicator: {
@@ -1043,25 +1468,25 @@ const styles = StyleSheet.create({
   },
   historyDate: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
   },
   historySymptoms: {
     fontSize: 12,
-    color: '#757575',
+    color: "#757575",
   },
   conditionDetail: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: "#e0e0e0",
   },
   conditionDetailText: {
     marginLeft: 8,
     fontSize: 14,
-    color: '#757575',
+    color: "#757575",
     flex: 1,
   },
   preventionItem: {
@@ -1070,7 +1495,7 @@ const styles = StyleSheet.create({
   preventionText: {
     fontSize: 16,
     lineHeight: 22,
-    color: '#222222',
-    fontWeight: '400',
+    color: "#222222",
+    fontWeight: "400",
   },
 });
