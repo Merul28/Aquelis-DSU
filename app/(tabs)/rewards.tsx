@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface UserStats {
   points: number;
@@ -177,6 +178,7 @@ const MOCK_LEADERBOARD: LeaderboardEntry[] = [
 ];
 
 export default function RewardsScreen() {
+  const { logout, user, userProfile, refreshUserProfile } = useAuth();
   const [userStats, setUserStats] = useState<UserStats>({
     points: 0,
     reportsSubmitted: 0,
@@ -193,31 +195,67 @@ export default function RewardsScreen() {
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
 
   useEffect(() => {
+    if (userProfile) {
+      // Update local stats with database data
+      setUserStats(prev => ({
+        ...prev,
+        points: userProfile.points,
+        level: userProfile.level,
+        reportsSubmitted: userProfile.reportsSubmitted,
+        streak: userProfile.streak,
+        totalEarned: userProfile.totalEarned,
+      }));
+    }
     loadUserStats();
     checkForNewAchievements();
-  }, []);
+  }, [userProfile]);
 
   const loadUserStats = async () => {
     try {
-      const savedStats = await AsyncStorage.getItem('userStats');
-      if (savedStats) {
-        const stats = JSON.parse(savedStats);
+      // If we have userProfile from database, use that as primary source
+      if (userProfile) {
         setUserStats(prev => ({
           ...prev,
-          ...stats,
-          achievements: ACHIEVEMENTS.map(achievement => ({
-            ...achievement,
-            unlocked: stats.achievements?.find((a: any) => a.id === achievement.id)?.unlocked || false,
-            unlockedDate: stats.achievements?.find((a: any) => a.id === achievement.id)?.unlockedDate
-          }))
+          points: userProfile.points,
+          level: userProfile.level,
+          reportsSubmitted: userProfile.reportsSubmitted,
+          streak: userProfile.streak,
+          totalEarned: userProfile.totalEarned,
         }));
         
         // Update leaderboard with user's actual stats
-        setLeaderboard(prev => prev.map(entry => 
-          entry.name === 'You' 
-            ? { ...entry, points: stats.points, level: stats.level, reportsSubmitted: stats.reportsSubmitted }
+        setLeaderboard(prev => prev.map(entry =>
+          entry.name === 'You'
+            ? {
+                ...entry,
+                points: userProfile.points,
+                level: userProfile.level,
+                reportsSubmitted: userProfile.reportsSubmitted
+              }
             : entry
         ));
+      } else {
+        // Fallback to AsyncStorage for backward compatibility
+        const savedStats = await AsyncStorage.getItem('userStats');
+        if (savedStats) {
+          const stats = JSON.parse(savedStats);
+          setUserStats(prev => ({
+            ...prev,
+            ...stats,
+            achievements: ACHIEVEMENTS.map(achievement => ({
+              ...achievement,
+              unlocked: stats.achievements?.find((a: any) => a.id === achievement.id)?.unlocked || false,
+              unlockedDate: stats.achievements?.find((a: any) => a.id === achievement.id)?.unlockedDate
+            }))
+          }));
+          
+          // Update leaderboard with user's actual stats
+          setLeaderboard(prev => prev.map(entry =>
+            entry.name === 'You'
+              ? { ...entry, points: stats.points, level: stats.level, reportsSubmitted: stats.reportsSubmitted }
+              : entry
+          ));
+        }
       }
     } catch (error) {
       console.error('Error loading user stats:', error);
@@ -335,6 +373,28 @@ export default function RewardsScreen() {
             } catch (error) {
               console.error('Error claiming reward:', error);
               Alert.alert('Error', 'Failed to claim reward. Please try again.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+            } catch (error) {
+              console.error('Logout error:', error);
+              Alert.alert('Error', 'Failed to logout. Please try again.');
             }
           }
         }
@@ -571,8 +631,20 @@ export default function RewardsScreen() {
   return (
     <View style={styles.container}>
       <ThemedView style={styles.header}>
-        <ThemedText type="title">Rewards & Achievements</ThemedText>
-        <ThemedText type="subtitle">Earn points and unlock rewards</ThemedText>
+        <View style={styles.headerContent}>
+          <View>
+            <ThemedText type="title">Rewards & Achievements</ThemedText>
+            <ThemedText type="subtitle">Earn points and unlock rewards</ThemedText>
+            {user && (
+              <ThemedText style={styles.welcomeText}>
+                Welcome, {user.name}! • {userProfile?.points || 0} points
+              </ThemedText>
+            )}
+          </View>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <IconSymbol name="rectangle.portrait.and.arrow.right" size={20} color="#333" />
+          </TouchableOpacity>
+        </View>
       </ThemedView>
 
       {/* Tab Navigation */}
@@ -674,9 +746,23 @@ const styles = StyleSheet.create({
   header: {
     padding: 20,
     paddingTop: 60,
-    alignItems: 'center',
     backgroundColor: '#FFD700',
     marginBottom: 0,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  welcomeText: {
+    fontSize: 14,
+    color: '#333',
+    marginTop: 4,
+  },
+  logoutButton: {
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 8,
   },
   tabContainer: {
     flexDirection: 'row',

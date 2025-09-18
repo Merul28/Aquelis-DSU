@@ -6,6 +6,10 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NotificationSystem, addAlertNotification } from '@/components/notification-system';
+import { useAuth } from '@/contexts/AuthContext';
+import { UserActions } from '@/lib/userActions';
+import { router } from 'expo-router';
+import { TestDatabaseActions } from '@/components/TestDatabaseActions';
 
 interface UserStats {
   points: number;
@@ -23,6 +27,7 @@ interface WaterQualityData {
 }
 
 export default function HomeScreen() {
+  const { user, userProfile, logout, refreshUserProfile } = useAuth();
   const [userStats, setUserStats] = useState<UserStats>({
     points: 0,
     reportsSubmitted: 0,
@@ -49,14 +54,89 @@ export default function HomeScreen() {
     return cleanup;
   }, []);
 
+  // Update user stats when userProfile changes
+  useEffect(() => {
+    if (userProfile) {
+      setUserStats({
+        points: userProfile.points,
+        reportsSubmitted: userProfile.reportsSubmitted,
+        level: userProfile.level,
+        streak: userProfile.streak
+      });
+    }
+  }, [userProfile]);
+
   const loadUserData = async () => {
     try {
-      const userData = await AsyncStorage.getItem('userStats');
-      if (userData) {
-        setUserStats(JSON.parse(userData));
+      // If we have userProfile from database, use that as primary source
+      if (userProfile) {
+        setUserStats({
+          points: userProfile.points,
+          reportsSubmitted: userProfile.reportsSubmitted,
+          level: userProfile.level,
+          streak: userProfile.streak
+        });
+      } else {
+        // Fallback to AsyncStorage for backward compatibility
+        const userData = await AsyncStorage.getItem('userStats');
+        if (userData) {
+          setUserStats(JSON.parse(userData));
+        }
       }
     } catch (error) {
       console.error('Error loading user data:', error);
+    }
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+            } catch (error) {
+              console.error('Logout error:', error);
+              Alert.alert('Error', 'Failed to logout. Please try again.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleQuickAction = async (action: string) => {
+    if (!user) return;
+
+    try {
+      switch (action) {
+        case 'sensors':
+          await UserActions.connectSensor(user.$id);
+          await refreshUserProfile();
+          router.push('/(tabs)/sensors');
+          break;
+        case 'health':
+          await UserActions.completeHealthCheck(user.$id);
+          await refreshUserProfile();
+          router.push('/(tabs)/symptoms');
+          break;
+        case 'report':
+          await UserActions.submitReport(user.$id);
+          await refreshUserProfile();
+          router.push('/(tabs)/report');
+          break;
+        case 'map':
+          router.push('/(tabs)/map');
+          break;
+      }
+    } catch (error) {
+      console.error('Error handling quick action:', error);
+      Alert.alert('Error', 'Failed to complete action. Please try again.');
     }
   };
 
@@ -138,13 +218,24 @@ export default function HomeScreen() {
           <View>
             <ThemedText type="title" style={styles.title}>Aquelis 2.0</ThemedText>
             <ThemedText type="subtitle" style={styles.subtitle}>Water Quality & Health Monitor</ThemedText>
+            {user && (
+              <ThemedText style={styles.welcomeText}>Welcome, {user.name}!</ThemedText>
+            )}
           </View>
-          <TouchableOpacity
-            style={styles.notificationButton}
-            onPress={() => setShowNotifications(true)}
-          >
-            <IconSymbol name="bell.fill" size={24} color="white" />
-          </TouchableOpacity>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity
+              style={styles.notificationButton}
+              onPress={() => setShowNotifications(true)}
+            >
+              <IconSymbol name="bell.fill" size={24} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.logoutButton}
+              onPress={handleLogout}
+            >
+              <IconSymbol name="rectangle.portrait.and.arrow.right" size={20} color="white" />
+            </TouchableOpacity>
+          </View>
         </View>
       </ThemedView>
 
@@ -215,22 +306,37 @@ export default function HomeScreen() {
         <ThemedText type="defaultSemiBold" style={[styles.sectionTitle, { color: '#333' }]}>Quick Actions</ThemedText>
         
         <View style={styles.actionsContainer}>
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => handleQuickAction('sensors')}
+          >
             <IconSymbol name="sensor.fill" size={24} color="#2196F3" />
             <ThemedText style={styles.actionText}>Check Sensors</ThemedText>
+            <ThemedText style={styles.actionSubtext}>+10 points</ThemedText>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => handleQuickAction('health')}
+          >
             <IconSymbol name="heart.fill" size={24} color="#E91E63" />
             <ThemedText style={styles.actionText}>Health Check</ThemedText>
+            <ThemedText style={styles.actionSubtext}>+15 points</ThemedText>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => handleQuickAction('report')}
+          >
             <IconSymbol name="exclamationmark.triangle.fill" size={24} color="#FF5722" />
             <ThemedText style={styles.actionText}>Report Issue</ThemedText>
+            <ThemedText style={styles.actionSubtext}>+25 points</ThemedText>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => handleQuickAction('map')}
+          >
             <IconSymbol name="map.fill" size={24} color="#4CAF50" />
             <ThemedText style={styles.actionText}>View Map</ThemedText>
           </TouchableOpacity>
@@ -276,10 +382,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
   },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   notificationButton: {
     padding: 8,
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  logoutButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  welcomeText: {
+    color: 'white',
+    fontSize: 14,
+    opacity: 0.9,
+    marginTop: 4,
   },
   title: {
     color: 'white',
@@ -382,6 +503,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     color: '#333',
+    fontWeight: '600',
+  },
+  actionSubtext: {
+    fontSize: 10,
+    textAlign: 'center',
+    color: '#4CAF50',
+    marginTop: 2,
+    fontWeight: '500',
   },
   tipContainer: {
     flexDirection: 'row',

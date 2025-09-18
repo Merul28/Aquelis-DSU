@@ -5,22 +5,24 @@ import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { AuthGuard } from '@/components/AuthGuard';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarStyle: {
-          paddingBottom: 20,
-          paddingTop: 10,
-          height: 90,
-        },
-      }}>
+    <AuthGuard>
+      <Tabs
+        screenOptions={{
+          tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+          headerShown: false,
+          tabBarButton: HapticTab,
+          tabBarStyle: {
+            paddingBottom: 20,
+            paddingTop: 10,
+            height: 90,
+          },
+        }}>
       <Tabs.Screen
         name="index"
         options={{
@@ -69,6 +71,7 @@ export default function TabLayout() {
           href: null, // Hide this tab
         }}
       />
-    </Tabs>
+      </Tabs>
+    </AuthGuard>
   );
 }
