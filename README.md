@@ -1,3 +1,4 @@
+A smart health monitoring & early warning system for water-borne diseases in rural Northeast India. Built using React Native (Expo), Firebase, and Gemini API to enable real-time reporting, AI-driven insights, and collaborative development.
 # Welcome to your Expo app 👋
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
